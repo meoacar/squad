@@ -1,0 +1,1295 @@
+import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, Between } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
+import { User } from '../users/entities/user.entity';
+import { Post } from '../posts/entities/post.entity';
+import { Report } from '../reports/entities/report.entity';
+import { Payment } from '../payments/entities/payment.entity';
+import { Setting } from '../settings/entities/setting.entity';
+import { Page } from '../pages/entities/page.entity';
+import { MenuItem } from '../pages/entities/menu-item.entity';
+import { AssignPremiumDto } from './dto/assign-premium.dto';
+import { AssignBoostDto } from './dto/assign-boost.dto';
+import { SuspendUserDto } from './dto/suspend-user.dto';
+import { BanUserDto } from './dto/ban-user.dto';
+import { UpdatePostDto } from './dto/update-post.dto';
+import { ResolveReportDto } from './dto/resolve-report.dto';
+import { UserStatus } from '../common/enums/user-status.enum';
+import { PostStatus } from '../common/enums/post-status.enum';
+import { AuditService } from './services/audit.service';
+import { AnalyticsService } from './services/analytics.service';
+import { QueueService } from './services/queue.service';
+import { DailyStat } from './entities/daily-stat.entity';
+import { CACHE_KEYS, CACHE_TTL } from './constants/cache-keys.constant';
+
+@Injectable()
+export class AdminService {
+    constructor(
+        @InjectRepository(User)
+        private readonly userRepository: Repository<User>,
+        @InjectRepository(Post)
+        private readonly postRepository: Repository<Post>,
+        @InjectRepository(Report)
+        private readonly reportRepository: Repository<Report>,
+        @InjectRepository(DailyStat)
+        private readonly dailyStatRepository: Repository<DailyStat>,
+        @InjectRepository(Payment)
+        private readonly paymentRepository: Repository<Payment>,
+        @InjectRepository(Setting)
+        private readonly settingRepository: Repository<Setting>,
+        @InjectRepository(Page)
+        private readonly pageRepository: Repository<Page>,
+        @InjectRepository(MenuItem)
+        private readonly menuItemRepository: Repository<MenuItem>,
+        private readonly auditService: AuditService,
+        private readonly analyticsService: AnalyticsService,
+        private readonly queueService: QueueService,
+        @Inject(CACHE_MANAGER)
+        private readonly cacheManager: Cache,
+    ) { }
+
+    /**
+     * Invalidate dashboard cache
+     */
+    private async invalidateDashboardCache() {
+        await this.cacheManager.del(CACHE_KEYS.DASHBOARD_STATS);
+    }
+
+    /**
+     * Invalidate all user-related caches
+     */
+    private async invalidateUserCaches() {
+        await this.invalidateDashboardCache();
+        // Note: Pattern-based deletion would require Redis directly
+        // For now, we invalidate specific known keys
+    }
+
+    /**
+     * Invalidate all post-related caches
+     */
+    private async invalidatePostCaches() {
+        await this.invalidateDashboardCache();
+    }
+
+    /**
+     * Invalidate all report-related caches
+     */
+    private async invalidateReportCaches() {
+        await this.invalidateDashboardCache();
+        await this.cacheManager.del(CACHE_KEYS.REPORT_STATS);
+    }
+
+    async getUsers(search?: string, status?: string, region?: string, page: number = 1, limit: number = 25) {
+        const query = this.userRepository.createQueryBuilder('user');
+
+        if (search) {
+            query.andWhere(
+                '(user.username ILIKE :search OR user.email ILIKE :search)',
+                { search: `%${search}%` },
+            );
+        }
+
+        if (status) {
+            query.andWhere('user.status = :status', { status });
+        }
+
+        if (region) {
+            query.andWhere('user.region = :region', { region });
+        }
+
+        query.orderBy('user.created_at', 'DESC');
+
+        // Add pagination
+        query.skip((page - 1) * limit);
+        query.take(limit);
+
+        const [users, total] = await query.getManyAndCount();
+
+        // Remove sensitive fields
+        const safeUsers = users.map(user => {
+            const { password, refresh_token, email_verification_token, password_reset_token, ...safeUser } = user;
+            return safeUser;
+        });
+
+        return { users: safeUsers, total, page, limit };
+    }
+
+    async getUserById(userId: string) {
+        const user = await this.userRepository.findOne({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        const { password, refresh_token, email_verification_token, password_reset_token, ...safeUser } = user;
+        return safeUser;
+    }
+
+    async updateUser(userId: string, dto: any, adminId: string) {
+        console.log('updateUser called with:', { userId, dto, adminId });
+
+        const user = await this.userRepository.findOne({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        // Allowed fields to update
+        const allowedFields = ['username', 'email', 'pubg_nickname', 'region', 'admin_notes', 'language'];
+        const updateData: any = {};
+
+        allowedFields.forEach(field => {
+            if (dto[field] !== undefined) {
+                updateData[field] = dto[field];
+            }
+        });
+
+        // Handle password change separately
+        if (dto.password && dto.password.length >= 6) {
+            const bcrypt = require('bcrypt');
+            const hashedPassword = await bcrypt.hash(dto.password, 10);
+            updateData.password = hashedPassword;
+            // Clear refresh token to force re-login
+            updateData.refresh_token = null;
+        }
+
+        // Handle email verification
+        if (dto.is_verified !== undefined) {
+            updateData.email_verified = dto.is_verified;
+            if (dto.is_verified) {
+                updateData.email_verified_at = new Date();
+            }
+        }
+
+        console.log('Update data to be saved:', updateData);
+
+        if (Object.keys(updateData).length === 0) {
+            throw new Error('No valid fields to update');
+        }
+
+        await this.userRepository.update(userId, updateData);
+
+        // Log the action
+        await this.auditService.log({
+            adminId: adminId,
+            action: 'USER_UPDATED',
+            targetType: 'USER',
+            targetId: userId,
+            details: { updated_fields: Object.keys(updateData) },
+        });
+
+        const updated = await this.userRepository.findOne({
+            where: { id: userId },
+        });
+
+        if (!updated) {
+            throw new NotFoundException('User not found after update');
+        }
+
+        console.log('User updated successfully:', updated.id);
+
+        const { password, refresh_token, email_verification_token, password_reset_token, ...safeUser } = updated;
+        return safeUser;
+    }
+
+    async assignPremium(userId: string, dto: AssignPremiumDto): Promise<User> {
+        const user = await this.userRepository.findOne({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + dto.days);
+
+        await this.userRepository.update(userId, {
+            is_premium: true,
+            premium_expires_at: expiresAt,
+            premium_tier: dto.tier || 'BASIC',
+        });
+
+        const updated = await this.userRepository.findOne({
+            where: { id: userId },
+        });
+
+        if (!updated) {
+            throw new NotFoundException('User not found after update');
+        }
+
+        return updated;
+    }
+
+    async removePremium(userId: string): Promise<User> {
+        const user = await this.userRepository.findOne({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        await this.userRepository.update(userId, {
+            is_premium: false,
+            premium_expires_at: undefined,
+            premium_tier: undefined,
+        });
+
+        const updated = await this.userRepository.findOne({
+            where: { id: userId },
+        });
+
+        if (!updated) {
+            throw new NotFoundException('User not found after update');
+        }
+
+        return updated;
+    }
+
+    async assignBoost(postId: string, dto: AssignBoostDto): Promise<Post> {
+        const post = await this.postRepository.findOne({
+            where: { id: postId },
+        });
+
+        if (!post) {
+            throw new NotFoundException('Post not found');
+        }
+
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + dto.hours);
+
+        await this.postRepository.update(postId, {
+            is_boosted: true,
+            boost_expires_at: expiresAt,
+        });
+
+        const updated = await this.postRepository.findOne({
+            where: { id: postId },
+            relations: ['creator', 'game'],
+        });
+
+        if (!updated) {
+            throw new NotFoundException('Post not found after update');
+        }
+
+        return updated;
+    }
+
+    async setFeatured(postId: string, featured: boolean): Promise<Post> {
+        const post = await this.postRepository.findOne({
+            where: { id: postId },
+        });
+
+        if (!post) {
+            throw new NotFoundException('Post not found');
+        }
+
+        const featuredUntil = featured ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) : undefined;
+
+        await this.postRepository.update(postId, {
+            is_featured: featured,
+            featured_until: featuredUntil,
+        });
+
+        const updated = await this.postRepository.findOne({
+            where: { id: postId },
+            relations: ['creator', 'game'],
+        });
+
+        if (!updated) {
+            throw new NotFoundException('Post not found after update');
+        }
+
+        return updated;
+    }
+
+    async getStats() {
+        // Get counts
+        const [
+            totalUsers,
+            activeUsers,
+            premiumUsers,
+            totalPosts,
+            activePosts,
+            boostedPosts,
+        ] = await Promise.all([
+            this.userRepository.count(),
+            this.userRepository.count({ where: { status: UserStatus.ACTIVE } }),
+            this.userRepository.count({ where: { is_premium: true } }),
+            this.postRepository.count(),
+            this.postRepository.count({ where: { status: PostStatus.ACTIVE } }),
+            this.postRepository.count({ where: { is_boosted: true } }),
+        ]);
+
+        // Get applications count (if applications table exists)
+        let totalApplications = 0;
+        try {
+            totalApplications = await this.postRepository
+                .createQueryBuilder('post')
+                .select('SUM(post.application_count)', 'total')
+                .getRawOne()
+                .then(result => parseInt(result?.total || '0'));
+        } catch (error) {
+            // Applications table might not exist yet
+            totalApplications = 0;
+        }
+
+        // Get reports count (if reports table exists)
+        let totalReports = 0;
+        let pendingReports = 0;
+        try {
+            const reportsRepo = this.userRepository.manager.getRepository('Report');
+            totalReports = await reportsRepo.count();
+            pendingReports = await reportsRepo.count({ where: { status: 'PENDING' } });
+        } catch (error) {
+            // Reports table might not exist yet
+            totalReports = 0;
+            pendingReports = 0;
+        }
+
+        return {
+            totalUsers,
+            activeUsers,
+            totalPosts,
+            activePosts,
+            totalApplications,
+            premiumUsers,
+            totalReports,
+            pendingReports,
+        };
+    }
+
+    // Dashboard Methods
+    async getDashboardStats() {
+        try {
+            const cached = await this.cacheManager.get(CACHE_KEYS.DASHBOARD_STATS);
+            if (cached) return cached;
+        } catch (error) {
+            // Cache error, continue without cache
+            console.warn('Cache get error:', error);
+        }
+
+        const stats = await this.getStats();
+
+        try {
+            await this.cacheManager.set(CACHE_KEYS.DASHBOARD_STATS, stats, CACHE_TTL.DASHBOARD_STATS * 1000);
+        } catch (error) {
+            // Cache error, continue without cache
+            console.warn('Cache set error:', error);
+        }
+
+        return stats;
+    }
+
+    async getDashboardCharts(period: string = '30d') {
+        const endDate = new Date();
+        const startDate = new Date();
+
+        if (period === '7d') {
+            startDate.setDate(startDate.getDate() - 7);
+        } else if (period === '30d') {
+            startDate.setDate(startDate.getDate() - 30);
+        } else if (period === '90d') {
+            startDate.setDate(startDate.getDate() - 90);
+        }
+
+        const dailyStats = await this.dailyStatRepository
+            .createQueryBuilder('stat')
+            .where('stat.date BETWEEN :start AND :end', { start: startDate, end: endDate })
+            .orderBy('stat.date', 'ASC')
+            .getMany();
+
+        return {
+            userGrowth: dailyStats.map(s => ({ date: s.date, users: s.new_users })),
+            postTrend: dailyStats.map(s => ({ date: s.date, posts: s.new_posts })),
+            revenue: dailyStats.map(s => ({ date: s.date, revenue: s.revenue })),
+        };
+    }
+
+    async getRecentActivities(limit: number = 20) {
+        return await this.auditService.getLogs({ page: 1, limit });
+    }
+
+    // User Management Methods
+    async suspendUser(userId: string, dto: SuspendUserDto, adminId: string) {
+        const user = await this.userRepository.findOne({ where: { id: userId } });
+        if (!user) throw new NotFoundException('User not found');
+
+        const suspendedUntil = new Date();
+        suspendedUntil.setDate(suspendedUntil.getDate() + dto.days);
+
+        await this.userRepository.update(userId, {
+            status: UserStatus.SUSPENDED,
+            suspended_until: suspendedUntil,
+            suspended_reason: dto.reason,
+        });
+
+        await this.auditService.log({
+            adminId,
+            action: 'USER_SUSPENDED',
+            targetType: 'user',
+            targetId: userId,
+            details: { days: dto.days, reason: dto.reason },
+        });
+
+        // Invalidate caches
+        await this.invalidateUserCaches();
+
+        return await this.userRepository.findOne({ where: { id: userId } });
+    }
+
+    async banUser(userId: string, dto: BanUserDto, adminId: string) {
+        const user = await this.userRepository.findOne({ where: { id: userId } });
+        if (!user) throw new NotFoundException('User not found');
+
+        await this.userRepository.update(userId, {
+            status: UserStatus.BANNED,
+            banned_at: new Date(),
+            banned_reason: dto.reason,
+        });
+
+        await this.auditService.log({
+            adminId,
+            action: 'USER_BANNED',
+            targetType: 'user',
+            targetId: userId,
+            details: { reason: dto.reason, permanent: dto.permanent },
+        });
+
+        // Invalidate caches
+        await this.invalidateUserCaches();
+
+        return await this.userRepository.findOne({ where: { id: userId } });
+    }
+
+    async unbanUser(userId: string, adminId: string) {
+        const user = await this.userRepository.findOne({ where: { id: userId } });
+        if (!user) throw new NotFoundException('User not found');
+
+        await this.userRepository.update(userId, {
+            status: UserStatus.ACTIVE,
+            banned_at: undefined,
+            banned_reason: undefined,
+        });
+
+        await this.auditService.log({
+            adminId,
+            action: 'USER_UNBANNED',
+            targetType: 'user',
+            targetId: userId,
+        });
+
+        // Invalidate caches
+        await this.invalidateUserCaches();
+
+        return await this.userRepository.findOne({ where: { id: userId } });
+    }
+
+    async getUserActivity(userId: string) {
+        const user = await this.userRepository.findOne({ where: { id: userId } });
+        if (!user) throw new NotFoundException('User not found');
+
+        const posts = await this.postRepository.count({ where: { created_by: userId } });
+        const recentPosts = await this.postRepository.find({
+            where: { created_by: userId },
+            order: { created_at: 'DESC' },
+            take: 10,
+        });
+
+        return {
+            user,
+            totalPosts: posts,
+            recentPosts,
+        };
+    }
+
+    async getUserPosts(userId: string, page: number = 1, limit: number = 25) {
+        const [posts, total] = await this.postRepository.findAndCount({
+            where: { created_by: userId },
+            order: { created_at: 'DESC' },
+            skip: (page - 1) * limit,
+            take: limit,
+        });
+
+        return { posts, total, page, limit };
+    }
+
+    async getUserApplications(userId: string) {
+        // This would require an applications table/entity
+        // For now, return empty array
+        return { applications: [], total: 0 };
+    }
+
+    async bulkSuspendUsers(userIds: string[], dto: SuspendUserDto, adminId: string) {
+        const suspendedUntil = new Date();
+        suspendedUntil.setDate(suspendedUntil.getDate() + dto.days);
+
+        await this.userRepository.update(userIds, {
+            status: UserStatus.SUSPENDED,
+            suspended_until: suspendedUntil,
+            suspended_reason: dto.reason,
+        });
+
+        await this.auditService.log({
+            adminId,
+            action: 'BULK_USER_SUSPENDED',
+            targetType: 'user',
+            details: { userIds, days: dto.days, reason: dto.reason },
+        });
+
+        return { success: true, count: userIds.length };
+    }
+
+    async bulkBanUsers(userIds: string[], dto: BanUserDto, adminId: string) {
+        await this.userRepository.update(userIds, {
+            status: UserStatus.BANNED,
+            banned_at: new Date(),
+            banned_reason: dto.reason,
+        });
+
+        await this.auditService.log({
+            adminId,
+            action: 'BULK_USER_BANNED',
+            targetType: 'user',
+            details: { userIds, reason: dto.reason },
+        });
+
+        return { success: true, count: userIds.length };
+    }
+
+    // Post Management Methods
+    async getPosts(filters: any, page: number = 1, limit: number = 25) {
+        const query = this.postRepository.createQueryBuilder('post');
+
+        if (filters.search) {
+            query.andWhere('post.title ILIKE :search', { search: `%${filters.search}%` });
+        }
+
+        if (filters.status) {
+            query.andWhere('post.status = :status', { status: filters.status });
+        }
+
+        if (filters.type) {
+            query.andWhere('post.type = :type', { type: filters.type });
+        }
+
+        query.orderBy('post.created_at', 'DESC');
+        query.skip((page - 1) * limit);
+        query.take(limit);
+
+        const [posts, total] = await query.getManyAndCount();
+        return { posts, total, page, limit };
+    }
+
+    async getPostById(postId: string) {
+        const post = await this.postRepository.findOne({
+            where: { id: postId },
+            relations: ['creator', 'game'],
+        });
+
+        if (!post) throw new NotFoundException('Post not found');
+        return post;
+    }
+
+    async updatePost(postId: string, dto: UpdatePostDto, adminId: string) {
+        const post = await this.postRepository.findOne({ where: { id: postId } });
+        if (!post) throw new NotFoundException('Post not found');
+
+        await this.postRepository.update(postId, dto);
+
+        await this.auditService.log({
+            adminId,
+            action: 'POST_UPDATED',
+            targetType: 'post',
+            targetId: postId,
+            details: dto,
+        });
+
+        return await this.postRepository.findOne({ where: { id: postId } });
+    }
+
+    async deletePost(postId: string, reason: string, adminId: string) {
+        const post = await this.postRepository.findOne({ where: { id: postId } });
+        if (!post) throw new NotFoundException('Post not found');
+
+        await this.postRepository.update(postId, {
+            deleted_at: new Date(),
+            deleted_by: adminId,
+            deletion_reason: reason,
+            status: PostStatus.DELETED,
+        });
+
+        await this.auditService.log({
+            adminId,
+            action: 'POST_DELETED',
+            targetType: 'post',
+            targetId: postId,
+            details: { reason },
+        });
+
+        return { success: true };
+    }
+
+    async pausePost(postId: string, adminId: string) {
+        const post = await this.postRepository.findOne({ where: { id: postId } });
+        if (!post) throw new NotFoundException('Post not found');
+
+        await this.postRepository.update(postId, {
+            status: PostStatus.PAUSED,
+        });
+
+        await this.auditService.log({
+            adminId,
+            action: 'POST_PAUSED',
+            targetType: 'post',
+            targetId: postId,
+        });
+
+        return await this.postRepository.findOne({ where: { id: postId } });
+    }
+
+    async resumePost(postId: string, adminId: string) {
+        const post = await this.postRepository.findOne({ where: { id: postId } });
+        if (!post) throw new NotFoundException('Post not found');
+
+        await this.postRepository.update(postId, {
+            status: PostStatus.ACTIVE,
+        });
+
+        await this.auditService.log({
+            adminId,
+            action: 'POST_RESUMED',
+            targetType: 'post',
+            targetId: postId,
+        });
+
+        return await this.postRepository.findOne({ where: { id: postId } });
+    }
+
+    async extendPost(postId: string, hours: number, adminId: string) {
+        const post = await this.postRepository.findOne({ where: { id: postId } });
+        if (!post) throw new NotFoundException('Post not found');
+
+        const newExpiresAt = new Date(post.expires_at);
+        newExpiresAt.setHours(newExpiresAt.getHours() + hours);
+
+        await this.postRepository.update(postId, {
+            expires_at: newExpiresAt,
+        });
+
+        await this.auditService.log({
+            adminId,
+            action: 'POST_EXTENDED',
+            targetType: 'post',
+            targetId: postId,
+            details: { hours },
+        });
+
+        return await this.postRepository.findOne({ where: { id: postId } });
+    }
+
+    // Report Management Methods
+    async getReports(filters: any, page: number = 1, limit: number = 25) {
+        const query = this.reportRepository.createQueryBuilder('report')
+            .leftJoinAndSelect('report.reporter', 'reporter')
+            .leftJoinAndSelect('report.post', 'post')
+            .leftJoinAndSelect('post.creator', 'creator');
+
+        if (filters.status) {
+            query.andWhere('report.status = :status', { status: filters.status });
+        }
+
+        if (filters.priority) {
+            query.andWhere('report.priority = :priority', { priority: filters.priority });
+        }
+
+        query.orderBy('report.priority', 'DESC');
+        query.addOrderBy('report.created_at', 'DESC');
+        query.skip((page - 1) * limit);
+        query.take(limit);
+
+        const [reports, total] = await query.getManyAndCount();
+
+        // Remove sensitive fields from related users
+        const safeReports = reports.map(report => {
+            const safeReport: any = { ...report };
+
+            // Add type field for frontend compatibility (maps to reason)
+            safeReport.type = safeReport.reason;
+
+            // Clean reporter data
+            if (safeReport.reporter) {
+                const { password, refresh_token, email_verification_token, password_reset_token, ...safeReporter } = safeReport.reporter;
+                safeReport.reporter = safeReporter;
+            }
+
+            // Rename post to reported_post and add reported_user for frontend compatibility
+            if (safeReport.post) {
+                const post = safeReport.post;
+
+                // Clean post creator data and set as reported_user
+                if (post.creator) {
+                    const { password, refresh_token, email_verification_token, password_reset_token, ...safeCreator } = post.creator;
+                    safeReport.reported_user = safeCreator;
+                }
+
+                safeReport.reported_post = post;
+                delete safeReport.post;
+            }
+
+            return safeReport;
+        });
+
+        return { reports: safeReports, total, page, limit };
+    }
+
+    async getReportById(reportId: string) {
+        const report = await this.reportRepository.findOne({
+            where: { id: reportId },
+            relations: ['reporter', 'post'],
+        });
+
+        if (!report) throw new NotFoundException('Report not found');
+        return report;
+    }
+
+    async resolveReport(reportId: string, dto: ResolveReportDto, adminId: string) {
+        const report = await this.reportRepository.findOne({ where: { id: reportId } });
+        if (!report) throw new NotFoundException('Report not found');
+
+        await this.reportRepository.update(reportId, {
+            status: dto.status as any,
+            resolution_notes: dto.resolution,
+            reviewed_by: adminId,
+        });
+
+        await this.auditService.log({
+            adminId,
+            action: 'REPORT_RESOLVED',
+            targetType: 'report',
+            targetId: reportId,
+            details: dto,
+        });
+
+        return await this.reportRepository.findOne({ where: { id: reportId } });
+    }
+
+    async dismissReport(reportId: string, reason: string, adminId: string) {
+        const report = await this.reportRepository.findOne({ where: { id: reportId } });
+        if (!report) throw new NotFoundException('Report not found');
+
+        await this.reportRepository.update(reportId, {
+            status: 'DISMISSED' as any,
+            resolution_notes: reason,
+            reviewed_by: adminId,
+        });
+
+        await this.auditService.log({
+            adminId,
+            action: 'REPORT_DISMISSED',
+            targetType: 'report',
+            targetId: reportId,
+            details: { reason },
+        });
+
+        return await this.reportRepository.findOne({ where: { id: reportId } });
+    }
+
+    async getReportStats() {
+        const [total, pending, resolved, dismissed] = await Promise.all([
+            this.reportRepository.count(),
+            this.reportRepository.count({ where: { status: 'PENDING' as any } }),
+            this.reportRepository.count({ where: { status: 'RESOLVED' as any } }),
+            this.reportRepository.count({ where: { status: 'DISMISSED' as any } }),
+        ]);
+
+        return { total, pending, resolved, dismissed };
+    }
+
+    async getSimilarReports(reportId: string) {
+        const report = await this.reportRepository.findOne({ where: { id: reportId } });
+        if (!report) throw new NotFoundException('Report not found');
+
+        const similar = await this.reportRepository.find({
+            where: {
+                post_id: report.post_id,
+                reason: report.reason,
+            },
+            take: 10,
+        });
+
+        return similar.filter(r => r.id !== reportId);
+    }
+
+    // Payment Management Methods
+    async getPayments(filters: any, page: number = 1, limit: number = 25) {
+        const query = this.paymentRepository.createQueryBuilder('payment')
+            .leftJoinAndSelect('payment.user', 'user');
+
+        if (filters.status) {
+            query.andWhere('payment.status = :status', { status: filters.status });
+        }
+
+        if (filters.type) {
+            query.andWhere('payment.type = :type', { type: filters.type });
+        }
+
+        if (filters.method) {
+            query.andWhere('payment.payment_method = :method', { method: filters.method });
+        }
+
+        if (filters.search) {
+            query.andWhere(
+                '(user.username ILIKE :search OR user.email ILIKE :search OR payment.transaction_id ILIKE :search)',
+                { search: `%${filters.search}%` },
+            );
+        }
+
+        query.orderBy('payment.created_at', 'DESC');
+        query.skip((page - 1) * limit);
+        query.take(limit);
+
+        const [payments, total] = await query.getManyAndCount();
+
+        // Remove sensitive user fields
+        const safePayments = payments.map(payment => {
+            const safePayment: any = { ...payment };
+            if (safePayment.user) {
+                const { password, refresh_token, email_verification_token, password_reset_token, ...safeUser } = safePayment.user;
+                safePayment.user = safeUser;
+            }
+            return safePayment;
+        });
+
+        return { payments: safePayments, total, page, limit };
+    }
+
+    async getPaymentById(paymentId: string) {
+        const payment = await this.paymentRepository.findOne({
+            where: { id: paymentId },
+            relations: ['user', 'refundedBy'],
+        });
+
+        if (!payment) throw new NotFoundException('Payment not found');
+
+        // Remove sensitive fields
+        const safePayment: any = { ...payment };
+        if (safePayment.user) {
+            const { password, refresh_token, email_verification_token, password_reset_token, ...safeUser } = safePayment.user;
+            safePayment.user = safeUser;
+        }
+        if (safePayment.refundedBy) {
+            const { password, refresh_token, email_verification_token, password_reset_token, ...safeRefunder } = safePayment.refundedBy;
+            safePayment.refundedBy = safeRefunder;
+        }
+
+        return safePayment;
+    }
+
+    async refundPayment(paymentId: string, reason: string, adminId: string) {
+        const payment = await this.paymentRepository.findOne({ where: { id: paymentId } });
+        if (!payment) throw new NotFoundException('Payment not found');
+
+        if (payment.status === 'REFUNDED' as any) {
+            throw new BadRequestException('Payment already refunded');
+        }
+
+        if (payment.status !== 'COMPLETED' as any) {
+            throw new BadRequestException('Only completed payments can be refunded');
+        }
+
+        await this.paymentRepository.update(paymentId, {
+            status: 'REFUNDED' as any,
+            refunded_at: new Date(),
+            refund_reason: reason,
+            refunded_by: adminId,
+        });
+
+        await this.auditService.log({
+            adminId,
+            action: 'PAYMENT_REFUNDED',
+            targetType: 'payment',
+            targetId: paymentId,
+            details: { reason, amount: payment.amount },
+        });
+
+        return await this.paymentRepository.findOne({ where: { id: paymentId } });
+    }
+
+    async getPaymentStats() {
+        const [
+            total,
+            completed,
+            pending,
+            failed,
+            refunded,
+            totalRevenue,
+            monthlyRevenue,
+        ] = await Promise.all([
+            this.paymentRepository.count(),
+            this.paymentRepository.count({ where: { status: 'COMPLETED' as any } }),
+            this.paymentRepository.count({ where: { status: 'PENDING' as any } }),
+            this.paymentRepository.count({ where: { status: 'FAILED' as any } }),
+            this.paymentRepository.count({ where: { status: 'REFUNDED' as any } }),
+            this.paymentRepository
+                .createQueryBuilder('payment')
+                .select('SUM(payment.amount)', 'total')
+                .where('payment.status = :status', { status: 'COMPLETED' })
+                .getRawOne()
+                .then(result => parseFloat(result?.total || '0')),
+            this.paymentRepository
+                .createQueryBuilder('payment')
+                .select('SUM(payment.amount)', 'total')
+                .where('payment.status = :status', { status: 'COMPLETED' })
+                .andWhere('payment.created_at >= :date', { date: new Date(new Date().setDate(1)) })
+                .getRawOne()
+                .then(result => parseFloat(result?.total || '0')),
+        ]);
+
+        return {
+            total,
+            completed,
+            pending,
+            failed,
+            refunded,
+            totalRevenue,
+            monthlyRevenue,
+        };
+    }
+
+
+    // Settings Management Methods
+    async getSettings(category?: string) {
+        const query = this.settingRepository.createQueryBuilder('setting');
+
+        if (category) {
+            query.where('setting.category = :category', { category });
+        }
+
+        query.orderBy('setting.category', 'ASC');
+        query.addOrderBy('setting.key', 'ASC');
+
+        const settings = await query.getMany();
+
+        // Group by category
+        const grouped = settings.reduce((acc, setting) => {
+            if (!acc[setting.category]) {
+                acc[setting.category] = [];
+            }
+            acc[setting.category].push(setting);
+            return acc;
+        }, {} as Record<string, any[]>);
+
+        return grouped;
+    }
+
+    async getSetting(key: string) {
+        const setting = await this.settingRepository.findOne({ where: { key } });
+        if (!setting) throw new NotFoundException(`Setting ${key} not found`);
+        return setting;
+    }
+
+    async updateSetting(key: string, value: string, adminId: string) {
+        let setting = await this.settingRepository.findOne({ where: { key } });
+
+        if (!setting) {
+            // Create new setting if it doesn't exist
+            setting = this.settingRepository.create({ key, value });
+        } else {
+            setting.value = value;
+        }
+
+        await this.settingRepository.save(setting);
+
+        await this.auditService.log({
+            adminId,
+            action: 'SETTING_UPDATED',
+            targetType: 'setting',
+            targetId: setting.id,
+            details: { key, value },
+        });
+
+        return setting;
+    }
+
+    async bulkUpdateSettings(settings: Record<string, string>, adminId: string) {
+        const results = [];
+
+        for (const [key, value] of Object.entries(settings)) {
+            const result = await this.updateSetting(key, value, adminId);
+            results.push(result);
+        }
+
+        return { success: true, updated: results.length };
+    }
+
+    async initializeDefaultSettings() {
+        const defaults = [
+            // General Settings
+            { key: 'site_name', value: 'Squadbul', category: 'GENERAL', description: 'Site adı' },
+            { key: 'site_description', value: 'PUBG Mobile Klan ve Oyuncu Bulma Platformu', category: 'GENERAL', description: 'Site açıklaması' },
+            { key: 'contact_email', value: 'info@squadbul.com', category: 'GENERAL', description: 'İletişim email adresi' },
+            { key: 'maintenance_mode', value: 'false', category: 'GENERAL', description: 'Bakım modu' },
+
+            // Payment Settings
+            { key: 'payment_enabled', value: 'true', category: 'PAYMENT', description: 'Ödeme sistemi aktif' },
+            { key: 'stripe_public_key', value: '', category: 'PAYMENT', description: 'Stripe public key' },
+            { key: 'stripe_secret_key', value: '', category: 'PAYMENT', description: 'Stripe secret key', is_public: false },
+            { key: 'premium_price_monthly', value: '9.99', category: 'PAYMENT', description: 'Aylık premium fiyatı (USD)' },
+            { key: 'premium_price_yearly', value: '99.99', category: 'PAYMENT', description: 'Yıllık premium fiyatı (USD)' },
+            { key: 'boost_price', value: '4.99', category: 'PAYMENT', description: 'İlan boost fiyatı (USD)' },
+
+            // Email Settings
+            { key: 'smtp_host', value: '', category: 'EMAIL', description: 'SMTP host' },
+            { key: 'smtp_port', value: '587', category: 'EMAIL', description: 'SMTP port' },
+            { key: 'smtp_user', value: '', category: 'EMAIL', description: 'SMTP kullanıcı adı' },
+            { key: 'smtp_password', value: '', category: 'EMAIL', description: 'SMTP şifre', is_public: false },
+            { key: 'email_from', value: 'noreply@squadbul.com', category: 'EMAIL', description: 'Gönderen email adresi' },
+
+            // Security Settings
+            { key: 'max_login_attempts', value: '5', category: 'SECURITY', description: 'Maksimum giriş denemesi' },
+            { key: 'session_timeout', value: '3600', category: 'SECURITY', description: 'Oturum zaman aşımı (saniye)' },
+            { key: 'require_email_verification', value: 'true', category: 'SECURITY', description: 'Email doğrulama zorunlu' },
+            { key: 'enable_2fa', value: 'false', category: 'SECURITY', description: '2FA aktif' },
+
+            // Feature Settings
+            { key: 'enable_premium', value: 'true', category: 'FEATURES', description: 'Premium üyelik aktif' },
+            { key: 'enable_boost', value: 'true', category: 'FEATURES', description: 'İlan boost aktif' },
+            { key: 'enable_notifications', value: 'true', category: 'FEATURES', description: 'Bildirimler aktif' },
+            { key: 'enable_chat', value: 'false', category: 'FEATURES', description: 'Chat sistemi aktif' },
+
+            // Limits
+            { key: 'max_posts_per_user', value: '10', category: 'LIMITS', description: 'Kullanıcı başına maksimum ilan' },
+            { key: 'max_posts_per_day', value: '3', category: 'LIMITS', description: 'Günlük maksimum ilan' },
+            { key: 'max_applications_per_day', value: '20', category: 'LIMITS', description: 'Günlük maksimum başvuru' },
+            { key: 'post_expiry_days', value: '30', category: 'LIMITS', description: 'İlan geçerlilik süresi (gün)' },
+        ];
+
+        for (const defaultSetting of defaults) {
+            const existing = await this.settingRepository.findOne({ where: { key: defaultSetting.key } });
+            if (!existing) {
+                const setting = this.settingRepository.create({
+                    ...defaultSetting,
+                    category: defaultSetting.category as any,
+                });
+                await this.settingRepository.save(setting);
+            }
+        }
+
+        return { success: true, message: 'Default settings initialized' };
+    }
+
+    // Pages Management Methods
+    async getPages(filters: any, page: number = 1, limit: number = 25) {
+        const query = this.pageRepository.createQueryBuilder('page');
+
+        if (filters.search) {
+            query.andWhere('(page.title ILIKE :search OR page.slug ILIKE :search)', { search: `%${filters.search}%` });
+        }
+
+        if (filters.status) {
+            query.andWhere('page.status = :status', { status: filters.status });
+        }
+
+        query.orderBy('page.updated_at', 'DESC');
+        query.skip((page - 1) * limit);
+        query.take(limit);
+
+        const [pages, total] = await query.getManyAndCount();
+        return { pages, total, page, limit };
+    }
+
+    async getPageById(id: string) {
+        const page = await this.pageRepository.findOne({ where: { id } });
+        if (!page) throw new NotFoundException('Page not found');
+        return page;
+    }
+
+    async getPageBySlug(slug: string) {
+        const page = await this.pageRepository.findOne({ where: { slug } });
+        if (!page) throw new NotFoundException('Page not found');
+
+        // Increment view count
+        await this.pageRepository.increment({ id: page.id }, 'view_count', 1);
+
+        return page;
+    }
+
+    async createPage(dto: any, adminId: string) {
+        const pageRepo = this.pageRepository;
+
+        const existing = await pageRepo.findOne({ where: { slug: dto.slug } });
+        if (existing) throw new BadRequestException('Slug already exists');
+
+        const page = pageRepo.create({
+            ...dto,
+            created_by: adminId,
+            updated_by: adminId,
+        }) as unknown as Page;
+
+        await pageRepo.save(page);
+
+        await this.auditService.log({
+            adminId,
+            action: 'PAGE_CREATED',
+            targetType: 'page',
+            targetId: page.id,
+            details: { slug: page.slug, title: page.title },
+        });
+
+        return page;
+    }
+
+    async updatePage(id: string, dto: any, adminId: string) {
+        const pageRepo = this.pageRepository;
+        const page = await pageRepo.findOne({ where: { id } });
+        if (!page) throw new NotFoundException('Page not found');
+
+        if (dto.slug && dto.slug !== page.slug) {
+            const existing = await pageRepo.findOne({ where: { slug: dto.slug } });
+            if (existing) throw new BadRequestException('Slug already exists');
+        }
+
+        await pageRepo.update(id, {
+            ...dto,
+            updated_by: adminId,
+        });
+
+        await this.auditService.log({
+            adminId,
+            action: 'PAGE_UPDATED',
+            targetType: 'page',
+            targetId: id,
+            details: dto,
+        });
+
+        return await pageRepo.findOne({ where: { id } });
+    }
+
+    async deletePage(id: string, adminId: string) {
+        const pageRepo = this.pageRepository;
+        const page = await pageRepo.findOne({ where: { id } });
+        if (!page) throw new NotFoundException('Page not found');
+
+        await pageRepo.delete(id);
+
+        await this.auditService.log({
+            adminId,
+            action: 'PAGE_DELETED',
+            targetType: 'page',
+            targetId: id,
+            details: { slug: page.slug, title: page.title },
+        });
+
+        return { success: true };
+    }
+
+    // Menu Items Management Methods
+    async getMenuItems(location?: string) {
+        const query = this.menuItemRepository.createQueryBuilder('menu');
+
+        if (location) {
+            query.where('menu.location = :location', { location });
+        }
+
+        query.orderBy('menu.order', 'ASC');
+        query.addOrderBy('menu.created_at', 'ASC');
+
+        const items = await query.getMany();
+
+        // Group by location
+        const grouped = items.reduce((acc, item) => {
+            if (!acc[item.location]) {
+                acc[item.location] = [];
+            }
+            acc[item.location].push(item);
+            return acc;
+        }, {} as Record<string, any[]>);
+
+        return grouped;
+    }
+
+    async getMenuItemById(id: string) {
+        const item = await this.menuItemRepository.findOne({ where: { id } });
+        if (!item) throw new NotFoundException('Menu item not found');
+        return item;
+    }
+
+    async createMenuItem(dto: any, adminId: string) {
+        const menuRepo = this.menuItemRepository;
+
+        const item = menuRepo.create(dto) as unknown as MenuItem;
+        await menuRepo.save(item);
+
+        await this.auditService.log({
+            adminId,
+            action: 'MENU_ITEM_CREATED',
+            targetType: 'menu_item',
+            targetId: item.id,
+            details: { label: item.label, url: item.url },
+        });
+
+        return item;
+    }
+
+    async updateMenuItem(id: string, dto: any, adminId: string) {
+        const menuRepo = this.menuItemRepository;
+        const item = await menuRepo.findOne({ where: { id } });
+        if (!item) throw new NotFoundException('Menu item not found');
+
+        await menuRepo.update(id, dto);
+
+        await this.auditService.log({
+            adminId,
+            action: 'MENU_ITEM_UPDATED',
+            targetType: 'menu_item',
+            targetId: id,
+            details: dto,
+        });
+
+        return await menuRepo.findOne({ where: { id } });
+    }
+
+    async deleteMenuItem(id: string, adminId: string) {
+        const menuRepo = this.menuItemRepository;
+        const item = await menuRepo.findOne({ where: { id } });
+        if (!item) throw new NotFoundException('Menu item not found');
+
+        await menuRepo.delete(id);
+
+        await this.auditService.log({
+            adminId,
+            action: 'MENU_ITEM_DELETED',
+            targetType: 'menu_item',
+            targetId: id,
+            details: { label: item.label, url: item.url },
+        });
+
+        return { success: true };
+    }
+
+    async reorderMenuItems(items: Array<{ id: string; order: number }>, adminId: string) {
+        const menuRepo = this.menuItemRepository;
+
+        for (const item of items) {
+            await menuRepo.update(item.id, { order: item.order });
+        }
+
+        await this.auditService.log({
+            adminId,
+            action: 'MENU_ITEMS_REORDERED',
+            targetType: 'menu_item',
+            details: { count: items.length },
+        });
+
+        return { success: true };
+    }
+
+}
