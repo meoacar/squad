@@ -38,6 +38,9 @@ export class Application {
     })
     status: ApplicationStatus;
 
+    @Column({ type: 'text', nullable: true })
+    rejection_reason: string | null;
+
     @CreateDateColumn()
     created_at: Date;
 

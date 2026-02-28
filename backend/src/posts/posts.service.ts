@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan } from 'typeorm';
 import { Post } from './entities/post.entity';
@@ -8,6 +8,7 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { FilterPostsDto } from './dto/filter-posts.dto';
 import { PostStatus } from '../common/enums';
+import { SearchService } from '../search/search.service';
 
 @Injectable()
 export class PostsService {
@@ -18,6 +19,8 @@ export class PostsService {
         private readonly gameRepository: Repository<Game>,
         @InjectRepository(User)
         private readonly userRepository: Repository<User>,
+        @Inject(forwardRef(() => SearchService))
+        private readonly searchService: SearchService,
     ) { }
 
     private generateSlug(title: string): string {
@@ -122,7 +125,18 @@ export class PostsService {
             status: PostStatus.ACTIVE,
         });
 
-        return await this.postRepository.save(post);
+        const savedPost = await this.postRepository.save(post);
+
+        // Index to Elasticsearch
+        const postWithRelations = await this.postRepository.findOne({
+            where: { id: savedPost.id },
+            relations: ['creator'],
+        });
+        if (postWithRelations) {
+            await this.searchService.indexPost(postWithRelations);
+        }
+
+        return savedPost;
     }
 
     async findAll(filterDto: FilterPostsDto) {
@@ -231,7 +245,12 @@ export class PostsService {
         }
 
         await this.postRepository.update(id, updatePostDto);
-        return await this.findOne(id);
+        const updatedPost = await this.findOne(id);
+
+        // Update Elasticsearch index
+        await this.searchService.indexPost(updatedPost);
+
+        return updatedPost;
     }
 
     async remove(id: string, userId: string): Promise<void> {
@@ -243,6 +262,9 @@ export class PostsService {
 
         // Soft delete
         await this.postRepository.update(id, { status: PostStatus.DELETED });
+
+        // Remove from Elasticsearch
+        await this.searchService.deletePost(id);
     }
 
     async pause(id: string, userId: string): Promise<Post> {

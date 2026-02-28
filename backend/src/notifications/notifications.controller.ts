@@ -1,53 +1,61 @@
 import {
     Controller,
-    Get,
-    Patch,
-    Param,
+    Post,
+    Body,
     UseGuards,
+    Request,
+    Delete,
+    Param,
 } from '@nestjs/common';
-import {
-    ApiTags,
-    ApiOperation,
-    ApiResponse,
-    ApiBearerAuth,
-} from '@nestjs/swagger';
-import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { User } from '../users/entities/user.entity';
+import { NotificationsService } from './notifications.service';
+import { SubscribeDto } from './dto/subscribe.dto';
+import { SendNotificationDto } from './dto/send-notification.dto';
+import { AdminGuard } from '../auth/guards/admin.guard';
 
-@ApiTags('notifications')
 @Controller('notifications')
-@UseGuards(JwtAuthGuard)
-@ApiBearerAuth()
 export class NotificationsController {
     constructor(private readonly notificationsService: NotificationsService) { }
 
-    @Get()
-    @ApiOperation({ summary: 'Get user notifications' })
-    @ApiResponse({ status: 200, description: 'Notifications retrieved successfully' })
-    async getNotifications(@CurrentUser() user: User) {
-        return await this.notificationsService.getUserNotifications(user.id);
+    @Post('subscribe')
+    @UseGuards(JwtAuthGuard)
+    async subscribe(@Request() req: any, @Body() subscribeDto: SubscribeDto) {
+        const userId = req.user.userId;
+        await this.notificationsService.saveSubscription(userId, subscribeDto);
+        return { success: true, message: 'Bildirim aboneliği oluşturuldu' };
     }
 
-    @Get('unread-count')
-    @ApiOperation({ summary: 'Get unread notification count' })
-    async getUnreadCount(@CurrentUser() user: User) {
-        const count = await this.notificationsService.getUnreadCount(user.id);
-        return { count };
+    @Delete('unsubscribe/:endpoint')
+    @UseGuards(JwtAuthGuard)
+    async unsubscribe(@Request() req: any, @Param('endpoint') endpoint: string) {
+        const userId = req.user.userId;
+        await this.notificationsService.removeSubscription(userId, endpoint);
+        return { success: true, message: 'Bildirim aboneliği kaldırıldı' };
     }
 
-    @Patch(':id/read')
-    @ApiOperation({ summary: 'Mark notification as read' })
-    async markAsRead(@CurrentUser() user: User, @Param('id') id: string) {
-        await this.notificationsService.markAsRead(id, user.id);
-        return { message: 'Notification marked as read' };
+    @Post('send')
+    @UseGuards(JwtAuthGuard, AdminGuard)
+    async sendNotification(@Body() sendNotificationDto: SendNotificationDto) {
+        const result = await this.notificationsService.sendNotification(
+            sendNotificationDto,
+        );
+        return {
+            success: true,
+            message: 'Bildirimler gönderildi',
+            sent: result.successful,
+            failed: result.failed,
+        };
     }
 
-    @Patch('read-all')
-    @ApiOperation({ summary: 'Mark all notifications as read' })
-    async markAllAsRead(@CurrentUser() user: User) {
-        await this.notificationsService.markAllAsRead(user.id);
-        return { message: 'All notifications marked as read' };
+    @Post('test')
+    @UseGuards(JwtAuthGuard)
+    async testNotification(@Request() req: any) {
+        const userId = req.user.userId;
+        await this.notificationsService.sendToUser(userId, {
+            title: 'Test Bildirimi',
+            body: 'Bu bir test bildirimidir',
+            url: '/',
+        });
+        return { success: true, message: 'Test bildirimi gönderildi' };
     }
 }

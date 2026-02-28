@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { ApplicationStatus } from '../entities/application.entity';
 
 export class UpdateApplicationDto {
@@ -10,4 +10,12 @@ export class UpdateApplicationDto {
     })
     @IsEnum(ApplicationStatus)
     status: ApplicationStatus;
+
+    @ApiPropertyOptional({
+        description: 'Rejection reason (optional, only for REJECTED status)',
+        example: 'Tier seviyesi uygun değil',
+    })
+    @IsOptional()
+    @IsString()
+    rejection_reason?: string;
 }

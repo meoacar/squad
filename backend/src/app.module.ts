@@ -18,7 +18,10 @@ import { PaymentsModule } from './payments/payments.module';
 import { SettingsModule } from './settings/settings.module';
 import { AdminModule } from './admin/admin.module';
 import { PagesModule } from './pages/pages.module';
+import { SearchModule } from './search/search.module';
 import { CacheConfigService } from './config/cache.config';
+import { BlogModule } from './blog/blog.module';
+import { AffiliatesModule } from './affiliates/affiliates.module';
 
 @Module({
   imports: [
@@ -96,6 +99,12 @@ import { CacheConfigService } from './config/cache.config';
     AdminModule,
 
     PagesModule,
+
+    SearchModule,
+
+    BlogModule,
+
+    AffiliatesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

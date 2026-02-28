@@ -23,14 +23,18 @@
     "migration:revert": "npm run typeorm -- migration:revert -d src/data-source.ts",
     "migration:show": "npm run typeorm -- migration:show -d src/data-source.ts",
     "migration:generate": "npm run typeorm -- migration:generate -d src/data-source.ts",
-    "migration:create": "npm run typeorm -- migration:create"
+    "migration:create": "npm run typeorm -- migration:create",
+    "elasticsearch:reindex": "ts-node -r tsconfig-paths/register scripts/reindex-elasticsearch.ts",
+    "seed:affiliates": "ts-node -r tsconfig-paths/register scripts/seed-affiliates.ts"
   },
   "dependencies": {
+    "@elastic/elasticsearch": "^9.3.2",
     "@nestjs/bull": "^11.0.4",
     "@nestjs/cache-manager": "^3.0.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.0.1",
+    "@nestjs/elasticsearch": "^11.1.0",
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
@@ -54,7 +58,8 @@
     "redis": "^5.11.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "typeorm": "^0.3.28"
+    "typeorm": "^0.3.28",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -70,6 +75,7 @@
     "@types/node": "^22.10.7",
     "@types/passport-jwt": "^4.0.1",
     "@types/supertest": "^6.0.2",
+    "@types/web-push": "^3.6.4",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",

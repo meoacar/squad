@@ -26,9 +26,9 @@ export enum PaymentStatus {
 
 export enum PaymentMethod {
     CREDIT_CARD = 'CREDIT_CARD',
-    PAYPAL = 'PAYPAL',
+    DEBIT_CARD = 'DEBIT_CARD',
     BANK_TRANSFER = 'BANK_TRANSFER',
-    CRYPTO = 'CRYPTO',
+    MOBILE_PAYMENT = 'MOBILE_PAYMENT',
 }
 
 @Entity('payments')

@@ -42,16 +42,15 @@ export class ApplicationsService {
             throw new BadRequestException('Cannot apply to your own post');
         }
 
-        // Check if already applied
+        // Check if already applied (any status except WITHDRAWN)
         const existingApplication = await this.applicationRepository.findOne({
             where: {
                 post_id: postId,
                 applicant_id: userId,
-                status: ApplicationStatus.PENDING,
             },
         });
 
-        if (existingApplication) {
+        if (existingApplication && existingApplication.status !== ApplicationStatus.WITHDRAWN) {
             throw new BadRequestException('You have already applied to this post');
         }
 
@@ -67,15 +66,11 @@ export class ApplicationsService {
         // Increment application count
         await this.postRepository.increment({ id: postId }, 'application_count', 1);
 
-        // Send notification to post creator
-        await this.notificationsService.create({
-            user_id: post.created_by,
-            type: NotificationType.APPLICATION_RECEIVED,
-            payload: {
-                post_id: postId,
-                post_title: post.title,
-                application_id: savedApplication.id,
-            },
+        // Send push notification to post creator
+        await this.notificationsService.sendToUser(post.created_by, {
+            title: 'Yeni Başvuru',
+            body: `İlanınıza yeni bir başvuru geldi: ${post.title}`,
+            url: `/posts/${postId}/applications`,
         });
 
         const result = await this.applicationRepository.findOne({
@@ -162,28 +157,21 @@ export class ApplicationsService {
 
         await this.applicationRepository.update(applicationId, {
             status: updateApplicationDto.status,
+            rejection_reason: updateApplicationDto.rejection_reason || null,
         });
 
-        // Send notification to applicant
+        // Send push notification to applicant
         if (updateApplicationDto.status === ApplicationStatus.ACCEPTED) {
-            await this.notificationsService.create({
-                user_id: application.applicant_id,
-                type: NotificationType.APPLICATION_ACCEPTED,
-                payload: {
-                    post_id: application.post_id,
-                    post_title: application.post.title,
-                    application_id: applicationId,
-                },
+            await this.notificationsService.sendToUser(application.applicant_id, {
+                title: 'Başvurunuz Kabul Edildi',
+                body: `${application.post.title} ilanına başvurunuz kabul edildi!`,
+                url: `/applications/${applicationId}`,
             });
         } else if (updateApplicationDto.status === ApplicationStatus.REJECTED) {
-            await this.notificationsService.create({
-                user_id: application.applicant_id,
-                type: NotificationType.APPLICATION_REJECTED,
-                payload: {
-                    post_id: application.post_id,
-                    post_title: application.post.title,
-                    application_id: applicationId,
-                },
+            await this.notificationsService.sendToUser(application.applicant_id, {
+                title: 'Başvurunuz Reddedildi',
+                body: `${application.post.title} ilanına başvurunuz reddedildi.`,
+                url: `/applications/${applicationId}`,
             });
         }
 
