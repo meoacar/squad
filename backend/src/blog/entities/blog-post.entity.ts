@@ -6,9 +6,11 @@ import {
     UpdateDateColumn,
     ManyToOne,
     JoinColumn,
+    OneToMany,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { BlogCategory } from './blog-category.entity';
+import { BlogComment } from './blog-comment.entity';
 
 export enum BlogPostStatus {
     DRAFT = 'DRAFT',
@@ -56,6 +58,9 @@ export class BlogPost {
     @ManyToOne(() => User)
     @JoinColumn({ name: 'author_id' })
     author: User;
+
+    @OneToMany(() => BlogComment, comment => comment.post)
+    comments: BlogComment[];
 
     @Column({ default: 0 })
     view_count: number;

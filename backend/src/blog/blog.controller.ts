@@ -150,4 +150,32 @@ export class BlogController {
         await this.blogService.deleteCategory(id);
         return { message: 'Category deleted successfully' };
     }
+
+    // Comment endpoints
+    @Post('posts/:id/comments')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Add comment to blog post' })
+    async addComment(
+        @Param('id') postId: string,
+        @Body() dto: { content: string },
+        @CurrentUser() user: any,
+    ) {
+        return await this.blogService.createComment(postId, user.id, dto.content);
+    }
+
+    @Get('posts/:id/comments')
+    @ApiOperation({ summary: 'Get comments for blog post' })
+    async getComments(@Param('id') postId: string) {
+        return await this.blogService.getCommentsByPost(postId);
+    }
+
+    @Delete('admin/comments/:id')
+    @UseGuards(JwtAuthGuard, AdminGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Delete comment (admin only)' })
+    async deleteComment(@Param('id') commentId: string) {
+        await this.blogService.deleteComment(commentId);
+        return { message: 'Comment deleted successfully' };
+    }
 }

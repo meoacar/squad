@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BlogPost, BlogPostStatus } from './entities/blog-post.entity';
 import { BlogCategory } from './entities/blog-category.entity';
+import { BlogComment } from './entities/blog-comment.entity';
 import { CreateBlogPostDto } from './dto/create-blog-post.dto';
 import { UpdateBlogPostDto } from './dto/update-blog-post.dto';
 import { CreateBlogCategoryDto } from './dto/create-blog-category.dto';
@@ -15,6 +16,8 @@ export class BlogService {
         private readonly blogPostRepository: Repository<BlogPost>,
         @InjectRepository(BlogCategory)
         private readonly blogCategoryRepository: Repository<BlogCategory>,
+        @InjectRepository(BlogComment)
+        private readonly commentRepository: Repository<BlogComment>,
     ) { }
 
     // Blog Posts
@@ -210,5 +213,31 @@ export class BlogService {
             .replace(/[^\w\s-]/g, '')
             .replace(/[\s_-]+/g, '-')
             .replace(/^-+|-+$/g, '') + '-' + Date.now();
+    }
+
+    // Comments
+    async createComment(postId: string, userId: string, content: string) {
+        const comment = this.commentRepository.create({
+            post_id: postId,
+            user_id: userId,
+            content,
+        });
+        return await this.commentRepository.save(comment);
+    }
+
+    async getCommentsByPost(postId: string) {
+        return await this.commentRepository.find({
+            where: { post_id: postId, is_approved: true },
+            relations: ['user'],
+            order: { created_at: 'DESC' },
+        });
+    }
+
+    async deleteComment(commentId: string) {
+        await this.commentRepository.delete(commentId);
+    }
+
+    async approveComment(commentId: string) {
+        await this.commentRepository.update(commentId, { is_approved: true });
     }
 }
