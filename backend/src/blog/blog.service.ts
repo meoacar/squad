@@ -22,7 +22,7 @@ export class BlogService {
 
     // Blog Posts
     async createPost(dto: CreateBlogPostDto, authorId: string): Promise<BlogPost> {
-        const slug = this.generateSlug(dto.title);
+        const slug = await this.generateSlug(dto.title);
 
         const post = this.blogPostRepository.create({
             ...dto,
@@ -126,7 +126,7 @@ export class BlogService {
         const post = await this.findPostById(id);
 
         if (dto.title && dto.title !== post.title) {
-            post.slug = this.generateSlug(dto.title);
+            post.slug = await this.generateSlug(dto.title);
         }
 
         if (dto.status === BlogPostStatus.PUBLISHED && !post.published_at) {
@@ -145,7 +145,7 @@ export class BlogService {
 
     // Blog Categories
     async createCategory(dto: CreateBlogCategoryDto): Promise<BlogCategory> {
-        const slug = this.generateSlug(dto.name);
+        const slug = await this.generateSlug(dto.name);
 
         const category = this.blogCategoryRepository.create({
             ...dto,
@@ -178,7 +178,7 @@ export class BlogService {
         const category = await this.findCategoryById(id);
 
         if (dto.name && dto.name !== category.name) {
-            category.slug = this.generateSlug(dto.name);
+            category.slug = await this.generateSlug(dto.name);
         }
 
         Object.assign(category, dto);
@@ -192,7 +192,7 @@ export class BlogService {
     }
 
     // Helper methods
-    private generateSlug(text: string): string {
+    private async generateSlug(text: string): Promise<string> {
         const turkishMap: { [key: string]: string } = {
             'ç': 'c', 'Ç': 'C',
             'ğ': 'g', 'Ğ': 'G',
@@ -207,12 +207,26 @@ export class BlogService {
             slug = slug.replace(new RegExp(key, 'g'), turkishMap[key]);
         });
 
-        return slug
+        // Clean slug - max 60 characters for SEO
+        let baseSlug = slug
             .toLowerCase()
             .trim()
             .replace(/[^\w\s-]/g, '')
             .replace(/[\s_-]+/g, '-')
-            .replace(/^-+|-+$/g, '') + '-' + Date.now();
+            .replace(/^-+|-+$/g, '')
+            .substring(0, 60)
+            .replace(/-+$/, ''); // Remove trailing dash if substring cut in middle
+
+        // Check if slug exists, if so add a number suffix
+        let finalSlug = baseSlug;
+        let counter = 1;
+
+        while (await this.blogPostRepository.findOne({ where: { slug: finalSlug } })) {
+            finalSlug = `${baseSlug}-${counter}`;
+            counter++;
+        }
+
+        return finalSlug;
     }
 
     // Comments

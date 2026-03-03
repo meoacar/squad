@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { CacheModule } from '@nestjs/cache-manager';
 import { BullModule } from '@nestjs/bull';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
@@ -22,6 +23,14 @@ import { SearchModule } from './search/search.module';
 import { CacheConfigService } from './config/cache.config';
 import { BlogModule } from './blog/blog.module';
 import { AffiliatesModule } from './affiliates/affiliates.module';
+import { FollowModule } from './social/follow/follow.module';
+import { MessageModule } from './social/message/message.module';
+import { RatingModule } from './social/rating/rating.module';
+import { ClanModule } from './social/clan/clan.module';
+import { SocialFeedModule } from './social/social-feed/social-feed.module';
+import { PrivacyModule } from './social/privacy/privacy.module';
+import { UploadModule } from './upload/upload.module';
+import { ContactModule } from './contact/contact.module';
 
 @Module({
   imports: [
@@ -76,6 +85,9 @@ import { AffiliatesModule } from './affiliates/affiliates.module';
       inject: [ConfigService],
     }),
 
+    // Event Emitter (Global)
+    EventEmitterModule.forRoot(),
+
     UsersModule,
 
     AuthModule,
@@ -105,6 +117,22 @@ import { AffiliatesModule } from './affiliates/affiliates.module';
     BlogModule,
 
     AffiliatesModule,
+
+    FollowModule,
+
+    MessageModule,
+
+    RatingModule,
+
+    ClanModule,
+
+    SocialFeedModule,
+
+    PrivacyModule,
+
+    UploadModule,
+
+    ContactModule,
   ],
   controllers: [AppController],
   providers: [AppService],

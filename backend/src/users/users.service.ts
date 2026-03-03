@@ -3,11 +3,12 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { User } from './entities/user.entity';
 import { Post } from '../posts/entities/post.entity';
 import { Application, ApplicationStatus } from '../applications/entities/application.entity';
 import { Favorite } from '../favorites/entities/favorite.entity';
+import { Follow } from '../social/entities';
 import { PostStatus } from '../common/enums';
 import { UserStatsDto } from './dto/user-stats.dto';
 
@@ -22,6 +23,8 @@ export class UsersService {
         private readonly applicationRepository: Repository<Application>,
         @InjectRepository(Favorite)
         private readonly favoriteRepository: Repository<Favorite>,
+        @InjectRepository(Follow)
+        private readonly followRepository: Repository<Follow>,
     ) { }
 
     async create(userData: Partial<User>): Promise<User> {
@@ -147,5 +150,75 @@ export class UsersService {
             favoritedBy,
             incomingApplications,
         };
+    }
+
+    async searchUsers(query?: string, limit: number = 20, currentUserId?: string): Promise<any[]> {
+        const queryBuilder = this.userRepository.createQueryBuilder('user');
+
+        if (query && query.trim()) {
+            queryBuilder.where(
+                'LOWER(user.username) LIKE LOWER(:query) OR LOWER(user.email) LIKE LOWER(:query)',
+                { query: `%${query}%` }
+            );
+        }
+
+        const users = await queryBuilder
+            .select(['user.id', 'user.username', 'user.email', 'user.avatar_url', 'user.bio'])
+            .orderBy('user.created_at', 'DESC')
+            .limit(limit)
+            .getMany();
+
+        console.log('🔍 Search Users - Current User ID:', currentUserId);
+        console.log('🔍 Search Users - Found users:', users.length);
+
+        // If no current user, return users without is_following
+        if (!currentUserId) {
+            console.log('⚠️ No current user, returning all users with is_following=false');
+            return users.map(user => ({ ...user, is_following: false }));
+        }
+
+        // Check follow status for each user
+        const userIds = users.map(u => u.id);
+
+        if (userIds.length === 0) {
+            return users.map(user => ({ ...user, is_following: false }));
+        }
+
+        const follows = await this.followRepository.find({
+            where: {
+                follower_id: currentUserId,
+                following_id: In(userIds),
+            },
+            select: ['following_id'],
+        });
+
+        console.log('✅ Found follows:', follows.length);
+        console.log('✅ Following IDs:', follows.map(f => f.following_id));
+
+        const followingIds = new Set(follows.map(f => f.following_id));
+
+        const result = users.map(user => ({
+            ...user,
+            is_following: followingIds.has(user.id),
+        }));
+
+        console.log('📤 Returning users with is_following:', result.map(u => ({ id: u.id, username: u.username, is_following: u.is_following })));
+
+        return result;
+    }
+
+    /**
+     * Update user avatar
+     */
+    async updateAvatar(userId: string, avatarUrl: string): Promise<User> {
+        await this.userRepository.update(userId, { avatar_url: avatarUrl });
+        return await this.findOne(userId);
+    }
+
+    /**
+     * Find user by ID (alias for findOne)
+     */
+    async findById(userId: string): Promise<User> {
+        return await this.findOne(userId);
     }
 }

@@ -1,0 +1,1494 @@
+{
+    "info": {
+        "name": "Social Features API",
+        "description": "Complete API collection for social features including Follow, Message, Rating, Clan, Social Feed, and Privacy systems",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{access_token}}",
+                "type": "string"
+            }
+        ]
+    },
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:3000",
+            "type": "string"
+        },
+        {
+            "key": "access_token",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "user_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "other_user_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "clan_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "activity_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "message_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "conversation_id",
+            "value": "",
+            "type": "string"
+        }
+    ],
+    "item": [
+        {
+            "name": "Follow System",
+            "item": [
+                {
+                    "name": "Follow User",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/follow/{{other_user_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "follow",
+                                "{{other_user_id}}"
+                            ]
+                        },
+                        "description": "Follow another user. Creates follow relationship or sends follow request for private profiles."
+                    }
+                },
+                {
+                    "name": "Unfollow User",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/follow/{{other_user_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "follow",
+                                "{{other_user_id}}"
+                            ]
+                        },
+                        "description": "Unfollow a user"
+                    }
+                },
+                {
+                    "name": "Get Followers",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/follow/{{user_id}}/followers?page=1&limit=20",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "follow",
+                                "{{user_id}}",
+                                "followers"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "20"
+                                }
+                            ]
+                        },
+                        "description": "Get list of followers for a user"
+                    }
+                },
+                {
+                    "name": "Get Following",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/follow/{{user_id}}/following?page=1&limit=20",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "follow",
+                                "{{user_id}}",
+                                "following"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "20"
+                                }
+                            ]
+                        },
+                        "description": "Get list of users that a user is following"
+                    }
+                },
+                {
+                    "name": "Get Follower Count",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/follow/{{user_id}}/followers/count",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "follow",
+                                "{{user_id}}",
+                                "followers",
+                                "count"
+                            ]
+                        },
+                        "description": "Get follower count for a user"
+                    }
+                },
+                {
+                    "name": "Get Following Count",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/follow/{{user_id}}/following/count",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "follow",
+                                "{{user_id}}",
+                                "following",
+                                "count"
+                            ]
+                        },
+                        "description": "Get following count for a user"
+                    }
+                },
+                {
+                    "name": "Check Is Following",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/follow/{{other_user_id}}/is-following",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "follow",
+                                "{{other_user_id}}",
+                                "is-following"
+                            ]
+                        },
+                        "description": "Check if current user is following another user"
+                    }
+                },
+                {
+                    "name": "Get Pending Follow Requests",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/follow/requests/pending",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "follow",
+                                "requests",
+                                "pending"
+                            ]
+                        },
+                        "description": "Get pending follow requests for current user"
+                    }
+                },
+                {
+                    "name": "Approve Follow Request",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/follow/requests/{{request_id}}/approve",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "follow",
+                                "requests",
+                                "{{request_id}}",
+                                "approve"
+                            ]
+                        },
+                        "description": "Approve a follow request"
+                    }
+                },
+                {
+                    "name": "Reject Follow Request",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/follow/requests/{{request_id}}/reject",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "follow",
+                                "requests",
+                                "{{request_id}}",
+                                "reject"
+                            ]
+                        },
+                        "description": "Reject a follow request"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Message System",
+            "item": [
+                {
+                    "name": "Send Direct Message",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"recipientId\": \"{{other_user_id}}\",\n  \"content\": \"Hello! How are you?\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/messages/direct",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "messages",
+                                "direct"
+                            ]
+                        },
+                        "description": "Send a direct message to another user"
+                    }
+                },
+                {
+                    "name": "Get Direct Messages",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/messages/direct/{{other_user_id}}?page=1&limit=50",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "messages",
+                                "direct",
+                                "{{other_user_id}}"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "50"
+                                }
+                            ]
+                        },
+                        "description": "Get direct messages with another user"
+                    }
+                },
+                {
+                    "name": "Get Conversations",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/messages/conversations",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "messages",
+                                "conversations"
+                            ]
+                        },
+                        "description": "Get all conversations for current user"
+                    }
+                },
+                {
+                    "name": "Send Group Message",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"groupId\": \"{{clan_id}}\",\n  \"content\": \"Hello team!\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/messages/group",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "messages",
+                                "group"
+                            ]
+                        },
+                        "description": "Send a message to clan group chat"
+                    }
+                },
+                {
+                    "name": "Get Group Messages",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/messages/group/{{clan_id}}?page=1&limit=50",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "messages",
+                                "group",
+                                "{{clan_id}}"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "50"
+                                }
+                            ]
+                        },
+                        "description": "Get messages from clan group chat"
+                    }
+                },
+                {
+                    "name": "Delete Group Message",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/messages/group/{{message_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "messages",
+                                "group",
+                                "{{message_id}}"
+                            ]
+                        },
+                        "description": "Delete a group message (admin only)"
+                    }
+                },
+                {
+                    "name": "Mark Message as Read",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/messages/{{message_id}}/read",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "messages",
+                                "{{message_id}}",
+                                "read"
+                            ]
+                        },
+                        "description": "Mark a message as read"
+                    }
+                },
+                {
+                    "name": "Get Unread Count",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/messages/unread/count",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "messages",
+                                "unread",
+                                "count"
+                            ]
+                        },
+                        "description": "Get unread message count"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Rating System",
+            "item": [
+                {
+                    "name": "Rate User",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"ratedUserId\": \"{{other_user_id}}\",\n  \"matchId\": \"match-uuid\",\n  \"rating\": 5,\n  \"comment\": \"Great player!\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/ratings",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "ratings"
+                            ]
+                        },
+                        "description": "Rate a user after a match"
+                    }
+                },
+                {
+                    "name": "Can Rate User",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/ratings/can-rate/{{other_user_id}}/{{match_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "ratings",
+                                "can-rate",
+                                "{{other_user_id}}",
+                                "{{match_id}}"
+                            ]
+                        },
+                        "description": "Check if current user can rate another user for a match"
+                    }
+                },
+                {
+                    "name": "Get User Ratings",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/ratings/user/{{user_id}}?page=1&limit=20",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "ratings",
+                                "user",
+                                "{{user_id}}"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "20"
+                                }
+                            ]
+                        },
+                        "description": "Get ratings for a user"
+                    }
+                },
+                {
+                    "name": "Get Average Rating",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/ratings/user/{{user_id}}/average",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "ratings",
+                                "user",
+                                "{{user_id}}",
+                                "average"
+                            ]
+                        },
+                        "description": "Get average rating for a user"
+                    }
+                },
+                {
+                    "name": "Get Rating Count",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/ratings/user/{{user_id}}/count",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "ratings",
+                                "user",
+                                "{{user_id}}",
+                                "count"
+                            ]
+                        },
+                        "description": "Get rating count for a user"
+                    }
+                },
+                {
+                    "name": "Check Trusted Badge",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/ratings/user/{{user_id}}/trusted-badge",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "ratings",
+                                "user",
+                                "{{user_id}}",
+                                "trusted-badge"
+                            ]
+                        },
+                        "description": "Check if user has trusted player badge"
+                    }
+                },
+                {
+                    "name": "Report Rating Comment",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"reason\": \"Inappropriate content\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/ratings/{{rating_id}}/report",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "ratings",
+                                "{{rating_id}}",
+                                "report"
+                            ]
+                        },
+                        "description": "Report a rating comment"
+                    }
+                },
+                {
+                    "name": "Hide Rating Comment",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/ratings/{{rating_id}}/hide",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "ratings",
+                                "{{rating_id}}",
+                                "hide"
+                            ]
+                        },
+                        "description": "Hide a rating comment (admin only)"
+                    }
+                },
+                {
+                    "name": "Delete Rating Comment",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/ratings/{{rating_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "ratings",
+                                "{{rating_id}}"
+                            ]
+                        },
+                        "description": "Delete a rating comment (admin only)"
+                    }
+                }
+            ]
+        }
+    ]
+},
+{
+    "name": "Clan System",
+    "item": [
+        {
+            "name": "Create Clan",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"name\": \"Elite Squad\",\n  \"description\": \"Competitive gaming clan\",\n  \"avatarUrl\": \"https://example.com/avatar.png\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/clans",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "clans"
+                    ]
+                },
+                "description": "Create a new clan"
+            }
+        },
+        {
+            "name": "Get Clan",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/clans/{{clan_id}}",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "clans",
+                        "{{clan_id}}"
+                    ]
+                },
+                "description": "Get clan details"
+            }
+        },
+        {
+            "name": "Update Clan",
+            "request": {
+                "method": "PATCH",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"description\": \"Updated description\",\n  \"avatarUrl\": \"https://example.com/new-avatar.png\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/clans/{{clan_id}}",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "clans",
+                        "{{clan_id}}"
+                    ]
+                },
+                "description": "Update clan details (admin only)"
+            }
+        },
+        {
+            "name": "Delete Clan",
+            "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/clans/{{clan_id}}",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "clans",
+                        "{{clan_id}}"
+                    ]
+                },
+                "description": "Delete clan (admin only)"
+            }
+        },
+        {
+            "name": "Get Clan Members",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/clans/{{clan_id}}/members",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "clans",
+                        "{{clan_id}}",
+                        "members"
+                    ]
+                },
+                "description": "Get all clan members"
+            }
+        },
+        {
+            "name": "Invite Member",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"inviteeId\": \"{{other_user_id}}\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/clans/{{clan_id}}/invite",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "clans",
+                        "{{clan_id}}",
+                        "invite"
+                    ]
+                },
+                "description": "Invite a user to clan (admin only)"
+            }
+        },
+        {
+            "name": "Accept Invitation",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/clans/invitations/{{invitation_id}}/accept",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "clans",
+                        "invitations",
+                        "{{invitation_id}}",
+                        "accept"
+                    ]
+                },
+                "description": "Accept clan invitation"
+            }
+        },
+        {
+            "name": "Reject Invitation",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/clans/invitations/{{invitation_id}}/reject",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "clans",
+                        "invitations",
+                        "{{invitation_id}}",
+                        "reject"
+                    ]
+                },
+                "description": "Reject clan invitation"
+            }
+        },
+        {
+            "name": "Remove Member",
+            "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/clans/{{clan_id}}/members/{{user_id}}",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "clans",
+                        "{{clan_id}}",
+                        "members",
+                        "{{user_id}}"
+                    ]
+                },
+                "description": "Remove member from clan (admin only)"
+            }
+        },
+        {
+            "name": "Leave Clan",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/clans/{{clan_id}}/leave",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "clans",
+                        "{{clan_id}}",
+                        "leave"
+                    ]
+                },
+                "description": "Leave clan"
+            }
+        },
+        {
+            "name": "Get User Clan",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/clans/user/{{user_id}}",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "clans",
+                        "user",
+                        "{{user_id}}"
+                    ]
+                },
+                "description": "Get clan for a user"
+            }
+        },
+        {
+            "name": "Get Clan Stats",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/clans/{{clan_id}}/stats",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "clans",
+                        "{{clan_id}}",
+                        "stats"
+                    ]
+                },
+                "description": "Get clan statistics"
+            }
+        },
+        {
+            "name": "Create Announcement",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"content\": \"Important announcement for all members!\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/clans/{{clan_id}}/announcements",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "clans",
+                        "{{clan_id}}",
+                        "announcements"
+                    ]
+                },
+                "description": "Create clan announcement (admin only)"
+            }
+        },
+        {
+            "name": "Get Announcements",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/clans/{{clan_id}}/announcements",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "clans",
+                        "{{clan_id}}",
+                        "announcements"
+                    ]
+                },
+                "description": "Get clan announcements"
+            }
+        },
+        {
+            "name": "Delete Announcement",
+            "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/clans/announcements/{{announcement_id}}",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "clans",
+                        "announcements",
+                        "{{announcement_id}}"
+                    ]
+                },
+                "description": "Delete announcement (admin only)"
+            }
+        },
+        {
+            "name": "Get Clan Leaderboard",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/clans/leaderboard?gameType=PUBG&limit=100",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "clans",
+                        "leaderboard"
+                    ],
+                    "query": [
+                        {
+                            "key": "gameType",
+                            "value": "PUBG"
+                        },
+                        {
+                            "key": "limit",
+                            "value": "100"
+                        }
+                    ]
+                },
+                "description": "Get clan leaderboard"
+            }
+        }
+    ]
+},
+{
+    "name": "Social Feed",
+    "item": [
+        {
+            "name": "Get User Feed",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/social-feed/feed?page=1&limit=20",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "social-feed",
+                        "feed"
+                    ],
+                    "query": [
+                        {
+                            "key": "page",
+                            "value": "1"
+                        },
+                        {
+                            "key": "limit",
+                            "value": "20"
+                        }
+                    ]
+                },
+                "description": "Get feed of activities from followed users"
+            }
+        },
+        {
+            "name": "Get User Activities",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/social-feed/activities/{{user_id}}?page=1&limit=20",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "social-feed",
+                        "activities",
+                        "{{user_id}}"
+                    ],
+                    "query": [
+                        {
+                            "key": "page",
+                            "value": "1"
+                        },
+                        {
+                            "key": "limit",
+                            "value": "20"
+                        }
+                    ]
+                },
+                "description": "Get activities for a specific user"
+            }
+        },
+        {
+            "name": "Create Activity",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"type\": \"GAME_LISTING_CREATED\",\n  \"data\": {\n    \"listingId\": \"listing-uuid\",\n    \"game\": \"PUBG\"\n  }\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/social-feed/activities",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "social-feed",
+                        "activities"
+                    ]
+                },
+                "description": "Create a new activity (manual)"
+            }
+        },
+        {
+            "name": "Like Activity",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/social-feed/activities/{{activity_id}}/like",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "social-feed",
+                        "activities",
+                        "{{activity_id}}",
+                        "like"
+                    ]
+                },
+                "description": "Like an activity (toggle)"
+            }
+        },
+        {
+            "name": "Unlike Activity",
+            "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/social-feed/activities/{{activity_id}}/like",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "social-feed",
+                        "activities",
+                        "{{activity_id}}",
+                        "like"
+                    ]
+                },
+                "description": "Unlike an activity"
+            }
+        },
+        {
+            "name": "Comment on Activity",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"content\": \"Great job!\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/social-feed/activities/{{activity_id}}/comments",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "social-feed",
+                        "activities",
+                        "{{activity_id}}",
+                        "comments"
+                    ]
+                },
+                "description": "Comment on an activity"
+            }
+        },
+        {
+            "name": "Delete Comment",
+            "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/social-feed/comments/{{comment_id}}",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "social-feed",
+                        "comments",
+                        "{{comment_id}}"
+                    ]
+                },
+                "description": "Delete a comment"
+            }
+        },
+        {
+            "name": "Get Activity Likes Count",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/social-feed/activities/{{activity_id}}/likes/count",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "social-feed",
+                        "activities",
+                        "{{activity_id}}",
+                        "likes",
+                        "count"
+                    ]
+                },
+                "description": "Get like count for an activity"
+            }
+        },
+        {
+            "name": "Get Activity Comments",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/social-feed/activities/{{activity_id}}/comments?page=1&limit=20",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "social-feed",
+                        "activities",
+                        "{{activity_id}}",
+                        "comments"
+                    ],
+                    "query": [
+                        {
+                            "key": "page",
+                            "value": "1"
+                        },
+                        {
+                            "key": "limit",
+                            "value": "20"
+                        }
+                    ]
+                },
+                "description": "Get comments for an activity"
+            }
+        },
+        {
+            "name": "Check User Liked",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/social-feed/activities/{{activity_id}}/likes/check",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "social-feed",
+                        "activities",
+                        "{{activity_id}}",
+                        "likes",
+                        "check"
+                    ]
+                },
+                "description": "Check if user has liked an activity"
+            }
+        }
+    ]
+},
+{
+    "name": "Privacy System",
+    "item": [
+        {
+            "name": "Set Profile Visibility",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"visibility\": \"PRIVATE\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/privacy/profile-visibility",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "privacy",
+                        "profile-visibility"
+                    ]
+                },
+                "description": "Set profile visibility (PUBLIC or PRIVATE)"
+            }
+        },
+        {
+            "name": "Get Profile Visibility",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/privacy/profile-visibility",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "privacy",
+                        "profile-visibility"
+                    ]
+                },
+                "description": "Get current profile visibility"
+            }
+        },
+        {
+            "name": "Set Rating Visibility",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"isHidden\": true\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/privacy/rating-visibility",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "privacy",
+                        "rating-visibility"
+                    ]
+                },
+                "description": "Set rating visibility (hidden or visible)"
+            }
+        },
+        {
+            "name": "Can View Rating",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/privacy/can-view-rating/{{user_id}}",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "privacy",
+                        "can-view-rating",
+                        "{{user_id}}"
+                    ]
+                },
+                "description": "Check if current user can view another user's rating"
+            }
+        },
+        {
+            "name": "Block User",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/privacy/block/{{other_user_id}}",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "privacy",
+                        "block",
+                        "{{other_user_id}}"
+                    ]
+                },
+                "description": "Block a user"
+            }
+        },
+        {
+            "name": "Unblock User",
+            "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/privacy/block/{{other_user_id}}",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "privacy",
+                        "block",
+                        "{{other_user_id}}"
+                    ]
+                },
+                "description": "Unblock a user"
+            }
+        },
+        {
+            "name": "Check Is Blocked",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/privacy/is-blocked/{{other_user_id}}",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "privacy",
+                        "is-blocked",
+                        "{{other_user_id}}"
+                    ]
+                },
+                "description": "Check if a user is blocked"
+            }
+        },
+        {
+            "name": "Get Blocked Users",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/privacy/blocked-users",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "privacy",
+                        "blocked-users"
+                    ]
+                },
+                "description": "Get list of blocked users"
+            }
+        },
+        {
+            "name": "Update Notification Preferences",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"email_messages\": true,\n  \"email_follow\": true,\n  \"email_clan_invites\": true,\n  \"email_activity_interactions\": true,\n  \"push_messages\": true,\n  \"push_follow\": true,\n  \"push_clan_invites\": true,\n  \"push_activity_interactions\": true\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/privacy/notification-preferences",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "privacy",
+                        "notification-preferences"
+                    ]
+                },
+                "description": "Update notification preferences"
+            }
+        },
+        {
+            "name": "Get Notification Preferences",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/privacy/notification-preferences",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "privacy",
+                        "notification-preferences"
+                    ]
+                },
+                "description": "Get notification preferences"
+            }
+        }
+    ]
+}
+]
+}

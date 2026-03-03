@@ -4,6 +4,7 @@ import {
     Patch,
     Body,
     Param,
+    Query,
     UseGuards,
     UseInterceptors,
     ClassSerializerInterceptor,
@@ -17,6 +18,7 @@ import {
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from './entities/user.entity';
 
@@ -67,6 +69,23 @@ export class UsersController {
         }
 
         return { available, suggestions };
+    }
+
+    @Get('search')
+    @UseGuards(OptionalJwtAuthGuard)
+    @ApiOperation({ summary: 'Search users by username or email' })
+    @ApiResponse({
+        status: 200,
+        description: 'Users retrieved successfully',
+    })
+    async searchUsers(
+        @CurrentUser() currentUser: User | undefined,
+        @Query('q') query?: string,
+        @Query('limit') limit?: number,
+    ) {
+        const searchLimit = limit && limit > 0 && limit <= 100 ? limit : 20;
+        const currentUserId = currentUser?.id;
+        return await this.usersService.searchUsers(query, searchLimit, currentUserId);
     }
 
     private async generateUsernameSuggestions(username: string): Promise<string[]> {
@@ -140,7 +159,7 @@ export class UsersController {
     }
 
     @Get(':username')
-    @ApiOperation({ summary: 'Get user profile by username (public)' })
+    @ApiOperation({ summary: 'Get user profile by username or ID (public)' })
     @ApiResponse({
         status: 200,
         description: 'User profile retrieved successfully',
@@ -150,6 +169,15 @@ export class UsersController {
         description: 'User not found',
     })
     async getUserByUsername(@Param('username') username: string) {
-        return await this.usersService.findByUsername(username);
+        // Check if it's a UUID (ID) or username
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+        if (uuidRegex.test(username)) {
+            // It's an ID, fetch by ID
+            return await this.usersService.findOne(username);
+        } else {
+            // It's a username, fetch by username
+            return await this.usersService.findByUsername(username);
+        }
     }
 }

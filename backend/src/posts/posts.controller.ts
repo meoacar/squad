@@ -55,6 +55,13 @@ export class PostsController {
         return await this.postsService.getUserPosts(user.id);
     }
 
+    @Get('user/:userId')
+    @ApiOperation({ summary: 'Get posts by user ID' })
+    @ApiResponse({ status: 200, description: 'User posts retrieved successfully' })
+    async getUserPosts(@Param('userId') userId: string) {
+        return await this.postsService.getUserPosts(userId);
+    }
+
     @Get('sitemap')
     @ApiOperation({ summary: 'Get sitemap for all active posts' })
     @ApiResponse({ status: 200, description: 'Sitemap retrieved successfully' })

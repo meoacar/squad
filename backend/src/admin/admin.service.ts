@@ -1038,13 +1038,29 @@ export class AdminService {
             { key: 'contact_email', value: 'info@squadbul.com', category: 'GENERAL', description: 'İletişim email adresi' },
             { key: 'maintenance_mode', value: 'false', category: 'GENERAL', description: 'Bakım modu' },
 
-            // Payment Settings
+            // Payment Settings - International
             { key: 'payment_enabled', value: 'true', category: 'PAYMENT', description: 'Ödeme sistemi aktif' },
             { key: 'stripe_public_key', value: '', category: 'PAYMENT', description: 'Stripe public key' },
             { key: 'stripe_secret_key', value: '', category: 'PAYMENT', description: 'Stripe secret key', is_public: false },
+
+            // Payment Settings - Turkish Payment Providers
+            { key: 'iyzico_enabled', value: 'true', category: 'PAYMENT', description: 'Iyzico ödeme sistemi aktif' },
+            { key: 'iyzico_api_key', value: '', category: 'PAYMENT', description: 'Iyzico API key', is_public: false },
+            { key: 'iyzico_secret_key', value: '', category: 'PAYMENT', description: 'Iyzico secret key', is_public: false },
+            { key: 'iyzico_base_url', value: 'https://sandbox-api.iyzipay.com', category: 'PAYMENT', description: 'Iyzico API URL (sandbox veya production)' },
+
+            { key: 'paytr_enabled', value: 'false', category: 'PAYMENT', description: 'PayTR ödeme sistemi aktif' },
+            { key: 'paytr_merchant_id', value: '', category: 'PAYMENT', description: 'PayTR merchant ID', is_public: false },
+            { key: 'paytr_merchant_key', value: '', category: 'PAYMENT', description: 'PayTR merchant key', is_public: false },
+            { key: 'paytr_merchant_salt', value: '', category: 'PAYMENT', description: 'PayTR merchant salt', is_public: false },
+
+            // Pricing
             { key: 'premium_price_monthly', value: '9.99', category: 'PAYMENT', description: 'Aylık premium fiyatı (USD)' },
             { key: 'premium_price_yearly', value: '99.99', category: 'PAYMENT', description: 'Yıllık premium fiyatı (USD)' },
             { key: 'boost_price', value: '4.99', category: 'PAYMENT', description: 'İlan boost fiyatı (USD)' },
+            { key: 'premium_price_monthly_try', value: '299.99', category: 'PAYMENT', description: 'Aylık premium fiyatı (TRY)' },
+            { key: 'premium_price_yearly_try', value: '2999.99', category: 'PAYMENT', description: 'Yıllık premium fiyatı (TRY)' },
+            { key: 'boost_price_try', value: '149.99', category: 'PAYMENT', description: 'İlan boost fiyatı (TRY)' },
 
             // Email Settings
             { key: 'smtp_host', value: '', category: 'EMAIL', description: 'SMTP host' },

@@ -171,6 +171,27 @@ export class User {
     @Index()
     last_activity_at: Date;
 
+    // Social feature fields
+    @Column({ type: 'decimal', precision: 2, scale: 1, default: 0.0 })
+    @Index()
+    rating_average: number;
+
+    @Column({ type: 'integer', default: 0 })
+    rating_count: number;
+
+    @Column({ type: 'boolean', default: false })
+    @Index()
+    has_trusted_badge: boolean;
+
+    @Column({ type: 'boolean', default: false })
+    rating_hidden: boolean;
+
+    @Column({ type: 'integer', default: 0 })
+    follower_count: number;
+
+    @Column({ type: 'integer', default: 0 })
+    following_count: number;
+
     @CreateDateColumn()
     created_at: Date;
 
